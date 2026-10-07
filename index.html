@@ -1,0 +1,338 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>RFT Gradient Fit</title>
+<style>
+:root{--bg:#f5f6f8;--card:#fff;--fg:#1c2330;--mut:#667085;--bd:#dde1e8;--acc:#1f6feb;--pt:#1c2330}
+@media (prefers-color-scheme:dark){:root{--bg:#12161d;--card:#1b212b;--fg:#e6e9ef;--mut:#8b95a7;--bd:#2c3442;--acc:#5b9dff;--pt:#e6e9ef}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.45 system-ui,Segoe UI,sans-serif}
+header{padding:14px 20px;border-bottom:1px solid var(--bd);background:var(--card)}
+h1{margin:0;font-size:18px}
+header span{color:var(--mut);font-size:12px}
+main{display:grid;grid-template-columns:minmax(320px,390px) 1fr;gap:16px;padding:16px;max-width:1350px;margin:auto}
+@media(max-width:820px){main{grid-template-columns:1fr}}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:14px;margin-bottom:14px}
+.card h2{margin:0 0 10px;font-size:13px;text-transform:uppercase;letter-spacing:.04em;color:var(--mut)}
+label{display:block;font-size:12px;color:var(--mut);margin-bottom:2px}
+.row{display:flex;gap:8px;align-items:center;margin-bottom:10px}
+.row>*{flex:1}
+select,input[type=number],input[type=text],input[type=color]{width:100%;padding:5px 7px;border:1px solid var(--bd);border-radius:6px;background:var(--bg);color:var(--fg);font:inherit}
+input[type=color]{padding:1px;height:30px;width:40px;flex:none;cursor:pointer}
+input[type=range]{width:100%}
+.sl{margin-bottom:14px}
+.sl .top{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.sl .top input[type=number]{width:110px}
+.sl b{font-size:13px}
+table{width:100%;border-collapse:collapse}
+th{font-size:11px;color:var(--mut);text-align:left;font-weight:500;padding:0 4px 4px}
+td{padding:2px}
+td input,td select{width:100%;padding:4px 6px;border:1px solid var(--bd);border-radius:5px;background:var(--bg);color:var(--fg);font:inherit}
+td.res{font-variant-numeric:tabular-nums;color:var(--mut);text-align:right;padding-right:6px;white-space:nowrap}
+button{padding:6px 10px;border:1px solid var(--bd);border-radius:6px;background:var(--bg);color:var(--fg);cursor:pointer;font:inherit}
+button:hover{border-color:var(--acc)}
+button.p{background:var(--acc);border-color:var(--acc);color:#fff}
+.x{padding:2px 7px;color:var(--mut)}
+.btns{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.tab{display:flex;align-items:center;gap:6px;padding:5px 10px;border:2px solid var(--bd);border-radius:20px;cursor:pointer;background:var(--bg)}
+.tab i{width:10px;height:10px;border-radius:50%;display:inline-block}
+.tab.on{border-color:var(--c)}
+.tab.add{color:var(--mut)}
+.stats{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+.stat{background:var(--bg);border-radius:8px;padding:8px 10px}
+.stat small{color:var(--mut);display:block;font-size:11px}
+.stat b{font-size:15px;font-variant-numeric:tabular-nums}
+svg{width:100%;height:auto;display:block;touch-action:none;cursor:ew-resize}
+textarea{width:100%;height:90px;background:var(--bg);color:var(--fg);border:1px solid var(--bd);border-radius:6px;padding:6px;font:12px monospace}
+.tip{font-size:12px;color:var(--mut)}
+#cont div{padding:4px 0;border-bottom:1px solid var(--bd);font-variant-numeric:tabular-nums}
+#cont div:last-child{border:0}
+</style>
+</head>
+<body>
+<header><h1>RFT — подбор градиентов давления и контактов</h1><span>Выберите линию (газ / нефть / вода), двигайте слайдеры или тяните линию мышью на графике. Контакты считаются по пересечению линий.</span></header>
+<main>
+<div>
+  <div class="card">
+    <h2>Единицы</h2>
+    <div class="row">
+      <div><label>Глубина</label><select id="du"><option value="1">м</option><option value="0.3048">фут</option></select></div>
+      <div><label>Давление</label><select id="pu"><option value="1">бар</option><option value="0.0689476">psi</option><option value="10">МПа</option><option value="0.01">кПа</option></select></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Линии градиента</h2>
+    <div class="tabs" id="tabs"></div>
+    <div class="row">
+      <div><label>Название</label><input type="text" id="lName"></div>
+      <input type="color" id="lColor" title="Цвет">
+      <button id="lDel" style="flex:none" title="Удалить линию">✕</button>
+    </div>
+    <div class="sl">
+      <div class="top"><b>Градиент</b><input type="number" id="gN" step="any"></div>
+      <input type="range" id="gS">
+      <div class="tip" id="gInfo"></div>
+    </div>
+    <div class="sl">
+      <div class="top"><b>Давление на опорной глубине</b><input type="number" id="pN" step="any"></div>
+      <input type="range" id="pS">
+    </div>
+    <div class="sl">
+      <div class="top"><b>Опорная глубина</b><input type="number" id="dN" step="any"></div>
+      <input type="range" id="dS">
+    </div>
+    <div class="btns"><button class="p" id="fit">МНК по точкам линии</button><button id="fitg">МНК, градиент фикс.</button></div>
+    <div class="tip" style="margin-top:6px">МНК использует точки, назначенные этой линии (колонка «Линия» в таблице). Если назначенных нет — все точки.</div>
+  </div>
+
+  <div class="card">
+    <h2>Точки RFT</h2>
+    <table><thead><tr><th>Глубина</th><th>Давление</th><th>Линия</th><th style="text-align:right">Δ</th><th></th></tr></thead><tbody id="tb"></tbody></table>
+    <div class="btns"><button id="add">+ точка</button><button id="paste">Вставить из текста</button><button id="demo">Пример</button><button id="clr">Очистить</button></div>
+    <div id="pasteBox" hidden style="margin-top:8px">
+      <textarea id="ta" placeholder="глубина давление [номер линии 1..N] — по строке"></textarea>
+      <div class="btns"><button class="p" id="pok">Загрузить</button></div>
+    </div>
+  </div>
+</div>
+
+<div>
+  <div class="card"><svg id="svg" viewBox="0 0 760 640"></svg>
+    <div class="btns"><button class="p" id="png">Сохранить PNG</button><button id="csv">Экспорт CSV</button></div>
+  </div>
+  <div class="card">
+    <h2>Контакты (пересечения линий)</h2>
+    <div id="cont"></div>
+  </div>
+  <div class="card">
+    <h2>Линии</h2>
+    <div class="stats" id="lstats"></div>
+  </div>
+</div>
+</main>
+
+<script>
+const $=id=>document.getElementById(id);
+const G=0.0980665; // бар/м на 1 г/см3
+const COLORS=['#e03131','#2f9e44','#1f6feb','#f08c00','#9c36b5','#0c8599'];
+let lines=[], act=0, pts=[];
+let nid=1;
+const du=()=>+$('du').value, pu=()=>+$('pu').value;
+const pUnit=()=>$('pu').selectedOptions[0].text, dUnit=()=>$('du').selectedOptions[0].text;
+const barmToUser=g=>g/pu()*du(), userToBarm=g=>g*pu()/du();
+const f=(v,n=2)=>isFinite(v)?(+v).toFixed(n):'—';
+const A=()=>lines[act];
+const model=(l,d)=>l.p0+l.g*(d-l.d0);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+function mkLine(name,rho,p0,d0){return {name,color:COLORS[(nid++-1)%COLORS.length],g:barmToUser(rho*G),p0,d0}}
+
+function demo(){
+  $('du').value=1;$('pu').value=1;prev={d:1,p:1};
+  // газ, нефть, вода
+  const pd=[[2400,247.5,0],[2420,247.9,0],[2440,248.4,0],
+            [2480,251.3,1],[2500,252.9,1],[2520,254.5,1],
+            [2560,258.3,2],[2600,262.3,2],[2640,266.2,2]];
+  pts=pd.map(([d,p,l])=>({d,p,l}));
+  nid=1;
+  lines=[mkLine('Газ',0.25,248,2430),mkLine('Нефть',0.82,252,2500),mkLine('Вода',1.02,262,2600)];
+  act=0; lines.forEach((l,i)=>{act=i;lsq(false)}); act=0;
+  rebuildTable();rebuildTabs();setRanges();draw();
+}
+
+function linePts(i){const a=pts.filter(x=>x.l===i&&isFinite(x.d)&&isFinite(x.p));return a.length?a:pts.filter(x=>isFinite(x.d)&&isFinite(x.p))}
+function lsq(fixG){
+  const l=A(), P=linePts(act), n=P.length; if(!n)return;
+  const md=P.reduce((a,x)=>a+x.d,0)/n, mp=P.reduce((a,x)=>a+x.p,0)/n;
+  l.d0=Math.round(md);
+  let sxx=0,sxy=0;P.forEach(x=>{sxx+=(x.d-md)**2;sxy+=(x.d-md)*(x.p-mp)});
+  if(!fixG&&n>=2&&sxx>0) l.g=sxy/sxx;
+  l.p0=mp+l.g*(l.d0-md);
+}
+
+function setRanges(){
+  const l=A(); if(!l)return;
+  const gc=[0.2,1.4].map(r=>barmToUser(r*G));
+  const gS=$('gS');gS.min=gc[0];gS.max=gc[1];gS.step=(gc[1]-gc[0])/2000;
+  const ds=pts.map(x=>x.d).filter(isFinite), ps=pts.map(x=>x.p).filter(isFinite);
+  const dmin=ds.length?Math.min(...ds):0,dmax=ds.length?Math.max(...ds):5000,dm=(dmax-dmin)||100;
+  const dS=$('dS');dS.min=dmin-dm;dS.max=dmax+dm;dS.step=dm/1000;
+  const pm=ps.length?ps.reduce((a,b)=>a+b,0)/ps.length:300,span=Math.max(pm*0.25,1);
+  const pS=$('pS');pS.min=pm-span;pS.max=pm+span;pS.step=span/2000;
+  $('gS').style.accentColor=$('pS').style.accentColor=$('dS').style.accentColor=l.color;
+}
+function syncCtrls(){
+  const l=A();
+  $('gS').value=l.g;$('pS').value=l.p0;$('dS').value=l.d0;
+  $('gN').value=f(l.g,4);$('pN').value=f(l.p0,2);$('dN').value=f(l.d0,1);
+  if(document.activeElement!==$('lName'))$('lName').value=l.name;
+  $('lColor').value=l.color;
+  const bm=userToBarm(l.g);
+  $('gInfo').textContent=`= ${f(bm,4)} бар/м = ${f(bm/0.0689476*0.3048,3)} psi/ft = ${f(bm/G,3)} г/см³`;
+}
+
+function rebuildTabs(){
+  const t=$('tabs');t.innerHTML='';
+  lines.forEach((l,i)=>{
+    const d=document.createElement('div');d.className='tab'+(i===act?' on':'');d.style.setProperty('--c',l.color);
+    d.innerHTML=`<i style="background:${l.color}"></i>${esc(l.name)}`;
+    d.onclick=()=>{act=i;rebuildTabs();setRanges();draw()};t.appendChild(d);
+  });
+  const a=document.createElement('div');a.className='tab add';a.textContent='+ линия';
+  a.onclick=()=>{
+    const l=lines[act]||{d0:2500,p0:250};
+    lines.push({name:'Линия '+(lines.length+1),color:COLORS[lines.length%COLORS.length],g:barmToUser(0.9*G),p0:l.p0,d0:l.d0});
+    act=lines.length-1;rebuildTabs();rebuildTable();setRanges();draw();
+  };
+  t.appendChild(a);
+}
+
+function rebuildTable(){
+  const tb=$('tb');tb.innerHTML='';
+  pts.forEach((x,i)=>{
+    const tr=document.createElement('tr');
+    const opts='<option value="-1">авто</option>'+lines.map((l,j)=>`<option value="${j}" ${x.l===j?'selected':''}>${esc(l.name)}</option>`).join('');
+    tr.innerHTML=`<td><input type="number" step="any" value="${x.d}"></td><td><input type="number" step="any" value="${x.p}"></td><td><select>${opts}</select></td><td class="res"></td><td><button class="x">✕</button></td>`;
+    const [a,b]=tr.querySelectorAll('input'),s=tr.querySelector('select');
+    a.oninput=()=>{x.d=parseFloat(a.value);draw()};b.oninput=()=>{x.p=parseFloat(b.value);draw()};
+    s.onchange=()=>{x.l=+s.value;draw()};
+    tr.querySelector('button').onclick=()=>{pts.splice(i,1);rebuildTable();draw()};
+    tb.appendChild(tr);
+  });
+}
+
+function owner(x){ // линия точки: назначенная или ближайшая по давлению
+  if(x.l>=0&&lines[x.l])return x.l;
+  let bi=0,bd=1e99;lines.forEach((l,i)=>{const r=Math.abs(x.p-model(l,x.d));if(r<bd){bd=r;bi=i}});return bi;
+}
+
+function contacts(){
+  const s=lines.map((l,i)=>({l,i})).sort((a,b)=>a.l.g-b.l.g), out=[];
+  for(let k=0;k<s.length-1;k++){
+    const a=s[k].l,b=s[k+1].l;if(Math.abs(a.g-b.g)<1e-9)continue;
+    const d=(b.p0-a.p0+a.g*a.d0-b.g*b.d0)/(a.g-b.g);
+    out.push({a,b,d,p:model(a,d)});
+  }
+  return out;
+}
+
+function draw(){
+  if(!lines.length)return;
+  syncCtrls();
+  const valid=pts.filter(x=>isFinite(x.d)&&isFinite(x.p));
+  const rows=$('tb').children;
+  const ss=lines.map(()=>({s:0,n:0}));
+  pts.forEach((x,i)=>{
+    if(!isFinite(x.d)||!isFinite(x.p))return;
+    const o=owner(x),r=x.p-model(lines[o],x.d);ss[o].s+=r*r;ss[o].n++;
+    if(rows[i])rows[i].querySelector('.res').innerHTML=`<span style="color:${lines[o].color}">●</span> ${r>=0?'+':''}${f(r,2)}`;
+  });
+  // статистика линий
+  $('lstats').innerHTML=lines.map((l,i)=>{
+    const bm=userToBarm(l.g),rho=bm/G;
+    const fl=rho<0.25?'газ':rho<0.45?'газ/конд.':rho<0.95?'нефть':rho<1.2?'вода':'рассол';
+    return `<div class="stat" style="border-left:4px solid ${l.color}"><small>${esc(l.name)} · ${fl}</small><b>${f(l.g,4)} ${pUnit()}/${dUnit()}</b><small>${f(rho,3)} г/см³ · RMS ${ss[i].n?f(Math.sqrt(ss[i].s/ss[i].n),3):'—'} (${ss[i].n} т.)</small></div>`;
+  }).join('');
+  const C=contacts();
+  $('cont').innerHTML=C.length?C.map(c=>`<div><b>${esc(c.a.name)} / ${esc(c.b.name)}</b>: глубина <b>${f(c.d,1)} ${dUnit()}</b>, давление ${f(c.p,2)} ${pUnit()}</div>`).join(''):'<span class="tip">Нужно минимум две линии с разным градиентом</span>';
+
+  // график
+  const W=760,H=640,m={l:60,r:20,t:20,b:50};
+  const ds=valid.map(x=>x.d);
+  let dmin=Math.min(...ds,...C.map(c=>c.d).filter(isFinite),...lines.map(l=>l.d0)),dmax=Math.max(...ds,...C.map(c=>c.d).filter(isFinite),...lines.map(l=>l.d0));
+  if(!isFinite(dmin)){dmin=0;dmax=1000}
+  const pad=(dmax-dmin)*0.12||50;dmin-=pad;dmax+=pad;
+  const pl=[...valid.map(x=>x.p)];lines.forEach(l=>pl.push(model(l,dmin),model(l,dmax)));
+  // не даём линиям с большим наклоном раздувать ось: ограничиваемся данными+25%
+  let pdat=valid.map(x=>x.p);let pmin,pmax;
+  if(pdat.length){pmin=Math.min(...pdat);pmax=Math.max(...pdat);const q=(pmax-pmin)*0.2||5;pmin-=q;pmax+=q}
+  else{pmin=Math.min(...pl);pmax=Math.max(...pl)}
+  const X=p=>m.l+(p-pmin)/(pmax-pmin)*(W-m.l-m.r), Y=d=>m.t+(d-dmin)/(dmax-dmin)*(H-m.t-m.b);
+  const tick=(a,b,n)=>{const s=(b-a)/n,e=Math.pow(10,Math.floor(Math.log10(s))),k=s/e,t=(k<1.5?1:k<3?2:k<7?5:10)*e,r=[];for(let v=Math.ceil(a/t)*t;v<=b;v+=t)r.push(+v.toFixed(8));return r};
+  let s=`<rect width="${W}" height="${H}" fill="var(--card)"/><defs><clipPath id="cp"><rect x="${m.l}" y="${m.t}" width="${W-m.l-m.r}" height="${H-m.t-m.b}"/></clipPath></defs>`;
+  tick(pmin,pmax,8).forEach(v=>s+=`<line x1="${X(v)}" x2="${X(v)}" y1="${m.t}" y2="${H-m.b}" stroke="var(--bd)"/><text x="${X(v)}" y="${H-m.b+16}" text-anchor="middle" fill="var(--mut)" font-size="11">${v}</text>`);
+  tick(dmin,dmax,10).forEach(v=>s+=`<line y1="${Y(v)}" y2="${Y(v)}" x1="${m.l}" x2="${W-m.r}" stroke="var(--bd)"/><text x="${m.l-6}" y="${Y(v)+4}" text-anchor="end" fill="var(--mut)" font-size="11">${v}</text>`);
+  s+=`<text x="${(W+m.l)/2}" y="${H-10}" text-anchor="middle" fill="var(--mut)" font-size="12">Давление, ${pUnit()}</text><text transform="translate(14 ${H/2}) rotate(-90)" text-anchor="middle" fill="var(--mut)" font-size="12">Глубина, ${dUnit()}</text>`;
+  s+=`<g clip-path="url(#cp)">`;
+  C.forEach(c=>s+=`<line x1="${m.l}" x2="${W-m.r}" y1="${Y(c.d)}" y2="${Y(c.d)}" stroke="var(--mut)" stroke-dasharray="6 4"/><text x="${W-m.r-6}" y="${Y(c.d)-5}" text-anchor="end" fill="var(--fg)" font-size="12">${esc(c.a.name)}/${esc(c.b.name)} ${f(c.d,1)} ${dUnit()}</text>`);
+  lines.forEach((l,i)=>s+=`<line x1="${X(model(l,dmin))}" y1="${Y(dmin)}" x2="${X(model(l,dmax))}" y2="${Y(dmax)}" stroke="${l.color}" stroke-width="${i===act?3.5:2}" opacity="${i===act?1:.75}"/>`);
+  valid.forEach(x=>{const o=lines[owner(x)];s+=`<line x1="${X(x.p)}" y1="${Y(x.d)}" x2="${X(model(o,x.d))}" y2="${Y(x.d)}" stroke="${o.color}" stroke-dasharray="3 2" opacity=".7"/>`});
+  valid.forEach(x=>{const o=lines[owner(x)];s+=`<circle cx="${X(x.p)}" cy="${Y(x.d)}" r="6" fill="${o.color}" stroke="var(--card)" stroke-width="2"/>`});
+  const l=A();s+=`<circle cx="${X(l.p0)}" cy="${Y(l.d0)}" r="6" fill="var(--card)" stroke="${l.color}" stroke-width="3"/></g>`;
+  // легенда
+  s+=lines.map((l,i)=>`<g transform="translate(${m.l+10} ${m.t+14+i*18})"><line x2="18" y1="-4" y2="-4" stroke="${l.color}" stroke-width="3"/><text x="24" fill="var(--fg)" font-size="12">${esc(l.name)}: ${f(l.g,4)} ${pUnit()}/${dUnit()} (${f(userToBarm(l.g)/G,2)} г/см³)</text></g>`).join('');
+  $('svg').innerHTML=s;$('svg')._map={pmin,pmax,W,m};
+}
+
+// перетаскивание активной линии по давлению
+const svg=$('svg');let drag=null;
+svg.addEventListener('pointerdown',e=>{drag={x:e.clientX,p0:A().p0,sc:svg.getBoundingClientRect().width/svg._map.W};svg.setPointerCapture(e.pointerId)});
+svg.addEventListener('pointermove',e=>{if(!drag)return;const M=svg._map;A().p0=drag.p0+(e.clientX-drag.x)/drag.sc*(M.pmax-M.pmin)/(M.W-M.m.l-M.m.r);draw()});
+svg.addEventListener('pointerup',()=>drag=null);
+
+function ext(a,v){if(v<+a.min)a.min=v;if(v>+a.max)a.max=v}
+$('gS').oninput=()=>{A().g=+$('gS').value;draw()};
+$('pS').oninput=()=>{A().p0=+$('pS').value;draw()};
+$('gN').onchange=()=>{const v=parseFloat($('gN').value);if(isFinite(v)){A().g=v;ext($('gS'),v);draw()}};
+$('pN').onchange=()=>{const v=parseFloat($('pN').value);if(isFinite(v)){A().p0=v;ext($('pS'),v);draw()}};
+function changeD0(v){if(!isFinite(v))return;const l=A();l.p0=model(l,v);l.d0=v;draw()}
+$('dS').oninput=()=>changeD0(+$('dS').value);
+$('dN').onchange=()=>{const v=parseFloat($('dN').value);ext($('dS'),v);changeD0(v)};
+$('lName').oninput=()=>{A().name=$('lName').value;rebuildTabs();rebuildTable();draw()};
+$('lColor').oninput=()=>{A().color=$('lColor').value;rebuildTabs();setRanges();draw()};
+$('lDel').onclick=()=>{
+  if(lines.length<=1)return;
+  pts.forEach(x=>{if(x.l===act)x.l=-1;else if(x.l>act)x.l--});
+  lines.splice(act,1);act=Math.max(0,act-1);rebuildTabs();rebuildTable();setRanges();draw();
+};
+$('fit').onclick=()=>{lsq(false);setRanges();draw()};
+$('fitg').onclick=()=>{lsq(true);setRanges();draw()};
+$('add').onclick=()=>{const l=pts[pts.length-1],a=A();pts.push({d:l?l.d+10:a.d0,p:l?l.p+a.g*10:a.p0,l:-1});rebuildTable();setRanges();draw()};
+$('clr').onclick=()=>{pts=[];rebuildTable();draw()};
+$('demo').onclick=demo;
+$('paste').onclick=()=>$('pasteBox').hidden=!$('pasteBox').hidden;
+$('pok').onclick=()=>{
+  const r=[];$('ta').value.split(/\n/).forEach(t=>{const n=t.replace(/,/g,'.').match(/-?\d+(\.\d+)?/g);
+    if(n&&n.length>=2){const li=n[2]?Math.min(Math.max(+n[2]-1,-1),lines.length-1):-1;r.push({d:+n[0],p:+n[1],l:li})}});
+  if(r.length){pts=r;rebuildTable();setRanges();$('pasteBox').hidden=true;
+    if(!pts.every(x=>x.l===-1)){const k=act;lines.forEach((_,i)=>{act=i;if(pts.some(x=>x.l===i))lsq(false)});act=k}
+    else lsq(false);
+    draw()}
+};
+
+let prev={d:1,p:1};
+function onUnits(){
+  const nd=du(),np=pu(),kd=prev.d/nd,kp=prev.p/np;
+  pts.forEach(x=>{x.d*=kd;x.p*=kp});
+  lines.forEach(l=>{l.d0*=kd;l.p0*=kp;l.g*=kp/kd});
+  prev={d:nd,p:np};rebuildTable();setRanges();draw();
+}
+$('du').onchange=$('pu').onchange=onUnits;
+
+// экспорт
+function dl(name,blob){const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)}
+$('png').onclick=()=>{
+  const cs=getComputedStyle(document.documentElement);
+  let src=new XMLSerializer().serializeToString(svg).replace(/var\((--[a-z]+)\)/g,(_,v)=>cs.getPropertyValue(v).trim());
+  src=src.replace('<svg','<svg xmlns="http://www.w3.org/2000/svg" width="1520" height="1280" font-family="Segoe UI,Arial,sans-serif"');
+  const img=new Image();
+  img.onload=()=>{const c=document.createElement('canvas');c.width=1520;c.height=1280;c.getContext('2d').drawImage(img,0,0);c.toBlob(b=>dl('rft-gradient.png',b))};
+  img.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(src);
+};
+$('csv').onclick=()=>{
+  let t=`# units: depth ${dUnit()}, pressure ${pUnit()}\nline;gradient;p_ref;d_ref\n`;
+  lines.forEach(l=>t+=`${l.name};${l.g};${l.p0};${l.d0}\n`);
+  t+='\ncontact;depth;pressure\n';contacts().forEach(c=>t+=`${c.a.name}/${c.b.name};${c.d};${c.p}\n`);
+  t+='\ndepth;pressure;line;residual\n';
+  pts.forEach(x=>{const o=lines[owner(x)];t+=`${x.d};${x.p};${o.name};${x.p-model(o,x.d)}\n`});
+  dl('rft-gradient.csv',new Blob(['﻿'+t],{type:'text/csv'}));
+};
+
+demo();
+</script>
+</body>
+</html>
